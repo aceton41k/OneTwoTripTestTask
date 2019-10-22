@@ -1,31 +1,25 @@
-import io.restassured.response.ValidatableResponseOptions;
-import org.testng.annotations.Test;
-
-import java.util.Map;
-
+import static com.jayway.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItems;
-import static com.jayway.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 
 public class Main extends BaseTest {
-    Map<String, String> cookies;
 
 
-    @Test
-    public void redirectToWWW() {
-        ValidatableResponseOptions vro = given()
+    private static String apiSearchPath="/_hotels/api/suggestRequest";
+
+    public static void redirectTest(String source, String location) {
+        given()
         .redirects().follow(false).and().redirects().max(0)
                 .when()
-                .get("https://onetwotrip.com")
+                .get(source)
                 .then()
                 .statusCode(301)
-                .header("location", "https://www.onetwotrip.com/");
+                .header("location", location);
     }
 
-    @Test
     public void redirectToRu() {
-        ValidatableResponseOptions vro = given()
+        given()
                 .redirects().follow(false).and().redirects().max(0)
                 .when()
                 .get("https://www.onetwotrip.com")
@@ -34,29 +28,37 @@ public class Main extends BaseTest {
                 .header("location", "https://www.onetwotrip.com/ru/");
     }
 
-    @Test
-    public void search() {
+    /***
+     *
+     * @param query строка или подстрока поиска
+     * @param searchType geo, city, airport
+     * @param results список результатов поиска через запятую без пробела
+     *
+     */
+    public static void search(String query, String searchType, String results) {
         given()
-                .param("query", "мос")
+                .param("query", query)
                 .param("limit", 7)
                 .param("hotelsFormLocation", "ott")
                 .param("lang", "ru")
                 .param("locale", "ru")
                 .param("currency", "RUB")
                 .when()
-                .log().parameters()
-                .get("/_hotels/api/suggestRequest")
+//                .log().parameters()
+                .get(apiSearchPath)
                 .then()
-//                .log().all()
                 .body(
                         "error", equalTo(null),
-                        // Здесь проверили, что возвращаются первые позиции из списка геолокаций, аэропортов и отелей.
-                        "result.findAll { it.type=='geo' }.name", hasItems("Москва", "Мостар", "Моссел-Бей"),
-                        "result.findAll { it.type=='hotel' }.name", hasItems("Москва Гост", "МОСКВА 1", "Красивые апартаменты в новом доме рядом с мостами и дворцами"),
-                        "result.findAll { it.type=='airport' }.name", hasItems("Шереметьево", "Домодедово", "Внуково")
-
+                        "result.findAll { it.type=='"+searchType+"' }.name", hasItems(results.split(","))
                 )
-                .assertThat().body(matchesJsonSchemaInClasspath("schema.json"))
+                .assertThat().body(matchesJsonSchemaInClasspath("schema.json")); // провверка на соответствие ответа схеме json
+    }
+
+    public static void accesibility() {
+        given()
+                .when()
+                .get(apiSearchPath)
+                .then()
                 .statusCode(200); // здесь проверили, что метод не отвалился и возвращает ОК
     }
 }
